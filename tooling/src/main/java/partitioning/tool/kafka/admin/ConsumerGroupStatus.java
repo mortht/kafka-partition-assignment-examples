@@ -21,9 +21,9 @@ public class ConsumerGroupStatus {
 
         // load args
         final Properties properties = PropertiesLoader.load(args[0]);
-        final String consumerGroup = args[1];
+        final AdminClient adminClient = AdminClient.create(properties);
 
-        AdminClient adminClient = AdminClient.create(properties);
+        final String consumerGroup = args[1];
 
         OffsetTopicsDescriber offsetTopicsDescriber = new OffsetTopicsDescriber(adminClient, consumerGroup);
         PartitionAssignmentDescriber partitionAssignmentDescriber = new PartitionAssignmentDescriber(adminClient, consumerGroup);
@@ -35,16 +35,17 @@ public class ConsumerGroupStatus {
             partitionAssignmentDescriber.refreshValues();
 
             System.out.println("Date: " + LocalDateTime.now() + " - consumerGroup: " + consumerGroup + "\n");
-            System.out.println("Topic     Partition   currentOffset   end Offset   Client Id      instanceId");
+            System.out.println("Topic    Partition   currentOffset   end Offset   message lag   Client Id      instanceId");
             for (var partition : offsetTopicsDescriber.getAllTopicsPartitions()) {
 
                 final long currentOffset = offsetTopicsDescriber.getCurrentOffsetOrDefault(partition, -1L);
                 final long endOffset = offsetTopicsDescriber.getEndOffsetOrDefault(partition, -1L);
+                final long lag = endOffset - currentOffset;
                 final String clientId = partitionAssignmentDescriber.getClientId(partition);
                 final String instanceId = partitionAssignmentDescriber.getInstanceId(partition);
 
-                final String message = String.format("%-9s %6s     %13s   %10s   %11s     %10s",
-                        partition.topic(), partition.partition(), currentOffset, endOffset, clientId, instanceId);
+                final String message = String.format("%-9s %6s     %13s   %10s   %11s   %11s     %10s",
+                        partition.topic(), partition.partition(), currentOffset, endOffset, lag, clientId, instanceId);
                 System.out.println(message);
             }
             System.out.println(partitionAssignmentDescriber.printAssignment());
