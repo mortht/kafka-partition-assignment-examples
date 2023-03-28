@@ -5,14 +5,7 @@ cd tooling
 mvn clean package
 cd ..
 
-# start cluster
-docker-compose down -v
-docker-compose up -d
-
-#
-cd tooling
-mvn clean package
-cd ..
+source /home/morthth/projects/kafka-cli/init-env.sh
 
 ALL_TOPICS=()
 TOPIC=0
@@ -30,9 +23,9 @@ while [ "$CREATE_TOPIC" != "n" ]; do
     else
       TOPIC_NAME="$TOPIC_PREFIX-$TOPIC"
       ALL_TOPICS+=($TOPIC_NAME)
-      kafka-topics --bootstrap-server localhost:29092 --create --topic $TOPIC_NAME --partitions $PARTITIONS --replication-factor 1
+      kafka-topics.sh --bootstrap-server localhost:30000 --command-config cmd-config.properties --create --topic $TOPIC_NAME --partitions $PARTITIONS --replication-factor 2
       echo "Adding initial data..."
-      kafka-producer-perf-test --topic $TOPIC_NAME --num-records 600000 --record-size 100 --throughput 10000 --producer-props bootstrap.servers=localhost:29092
+      kafka-producer-perf-test.sh --topic $TOPIC_NAME --num-records 600000 --record-size 100 --throughput 10000 --producer.config producer-config.properties
       let TOPIC++
     fi
   fi
@@ -43,7 +36,3 @@ echo "all topics = $ALL_TOPICS"
 cd tooling
 java -cp target/partitioning-tool-1.0.0-SNAPSHOT-jar-with-dependencies.jar partitioning.tool.kafka.producer.ProducerStarter config.properties 10 "$ALL_TOPICS"
 
-echo "***********************************"
-echo "* REMEMBER TO DESTROY THE CLUSTER *"
-echo " >>>  docker-compose down -v  <<< *"
-echo "***********************************"

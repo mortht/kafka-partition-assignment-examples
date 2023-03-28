@@ -3,7 +3,7 @@
 See the behavior of the partition assignment in different configuration
 
 ## Pre-requisites
-* docker-compose
+* Running Confluent platform e.g. a local k3d cluster using Confluent for Kubernetes operator
 * [Confluent CLI](https://docs.confluent.io/platform/current/installation/installing_cp/zip-tar.html)
 
 ## How to run
@@ -19,10 +19,6 @@ In one terminal, start the cluster and producer (you will be asked some question
 Example:
 
       ./launch-producer.sh
-      [+] Running 3/3
-      ⠿ Network kafka-partition-assignment-examples_default  Created                <-- cluster being started                                                                                                                      0.0s
-      ⠿ Container zookeeper                                  Started                                                                                                                                      0.4s
-      ⠿ Container broker                                     Started                                                                                                                                      0.7s
       
       Should I create a new topic? [y/n]: y
       How many partitions? 1
@@ -128,10 +124,10 @@ Example:
 
 ### Clean up
 
-1. Stop all scripts
-2. Run
-
-    docker-compose down -v
+      ./cleanup.sh
+      
+      :TODO
 
 # References:
 - https://medium.com/streamthoughts/understanding-kafka-partition-assignment-strategies-and-how-to-write-your-own-custom-assignor-ebeda1fc06f3
+- https://github.com/tomasalmeida/kafka-partition-assignment-examples
