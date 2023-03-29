@@ -35,11 +35,10 @@ public class OffsetTopicsDescriber {
      * @throws ExecutionException
      * @throws InterruptedException
      */
-    public OffsetTopicsDescriber(final AdminClient adminClient, final String consumerGroup) throws ExecutionException, InterruptedException {
+    public OffsetTopicsDescriber(final AdminClient adminClient, final String consumerGroup) {
         this.adminClient = adminClient;
         this.consumerGroup = consumerGroup;
         this.readOptions = new ListOffsetsOptions();
-        refreshValues();
     }
 
     public void refreshValues() throws ExecutionException, InterruptedException {

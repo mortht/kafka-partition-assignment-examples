@@ -2,8 +2,12 @@ package partitioning.tool.kafka.admin;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.admin.AdminClient;
 
@@ -21,36 +25,54 @@ public class ConsumerGroupStatus {
 
         // load args
         final Properties properties = PropertiesLoader.load(args[0]);
-        final AdminClient adminClient = AdminClient.create(properties);
+        try (AdminClient adminClient = AdminClient.create(properties)) {
 
-        final String consumerGroup = args[1];
+            final List<String> consumerGroups = Arrays.asList(args[1].split("\\s*,\\s*"));
+            System.out.println("Date: " + LocalDateTime.now() + " - consumerGroups: " + consumerGroups + "\n");
 
-        OffsetTopicsDescriber offsetTopicsDescriber = new OffsetTopicsDescriber(adminClient, consumerGroup);
-        PartitionAssignmentDescriber partitionAssignmentDescriber = new PartitionAssignmentDescriber(adminClient, consumerGroup);
+            final Map<String, PartitionAssignmentDescriber> partitionAssignmentDescriberMap = consumerGroups.stream()
+                    .collect(Collectors.toMap(consumerGroup -> consumerGroup, consumerGroup -> new PartitionAssignmentDescriber(adminClient, consumerGroup)));
 
-        while (true) {
-            cleanOutput();
+            final Map<String, OffsetTopicsDescriber> offsetTopicsDescriberMap = consumerGroups.stream()
+                    .collect(Collectors.toMap(consumerGroup -> consumerGroup, consumerGroup -> new OffsetTopicsDescriber(adminClient, consumerGroup)));
 
-            offsetTopicsDescriber.refreshValues();
-            partitionAssignmentDescriber.refreshValues();
+            final String tableRowTemplate = "%-40.40s  %-4.4s  %-12s  %-12s  %-12s  %-40.40s  %-40.40s";
 
-            System.out.println("Date: " + LocalDateTime.now() + " - consumerGroup: " + consumerGroup + "\n");
-            System.out.println("Topic    Partition   currentOffset   end Offset   message lag   Client Id      instanceId");
-            for (var partition : offsetTopicsDescriber.getAllTopicsPartitions()) {
+            while (true) {
+                cleanOutput();
 
-                final long currentOffset = offsetTopicsDescriber.getCurrentOffsetOrDefault(partition, -1L);
-                final long endOffset = offsetTopicsDescriber.getEndOffsetOrDefault(partition, -1L);
-                final long lag = endOffset - currentOffset;
-                final String clientId = partitionAssignmentDescriber.getClientId(partition);
-                final String instanceId = partitionAssignmentDescriber.getInstanceId(partition);
+                System.out.println("Date: " + LocalDateTime.now() + " - consumerGroups: " + consumerGroups + "\n");
+                System.out.println(String.format(tableRowTemplate,
+                        "Topic", "Partition", "curr Offset", "end Offset", "message lag", "client Id", "consumerGroup"));
+                for (var consumerGroup : consumerGroups) {
+                    var offsetTopicsDescriber = offsetTopicsDescriberMap.get(consumerGroup);
+                    var partitionAssignmentDescriber = partitionAssignmentDescriberMap.get(consumerGroup);
 
-                final String message = String.format("%-9s %6s     %13s   %10s   %11s   %11s     %10s",
-                        partition.topic(), partition.partition(), currentOffset, endOffset, lag, clientId, instanceId);
-                System.out.println(message);
+                    offsetTopicsDescriber.refreshValues();
+                    partitionAssignmentDescriber.refreshValues();
+
+                    for (var partition : offsetTopicsDescriber.getAllTopicsPartitions()) {
+
+                        final long currentOffset = offsetTopicsDescriber.getCurrentOffsetOrDefault(partition, -1L);
+                        final long endOffset = offsetTopicsDescriber.getEndOffsetOrDefault(partition, -1L);
+                        final long lag = endOffset - currentOffset;
+                        final String clientId = partitionAssignmentDescriber.getClientId(partition);
+                        final String instanceId = partitionAssignmentDescriber.getInstanceId(partition);
+
+                        System.out.println(String.format(tableRowTemplate,
+                                partition.topic(), partition.partition(), currentOffset, endOffset, lag, clientId, consumerGroup));
+                    }
+                }
+
+//            for (var consumerGroup : consumerGroups) {
+//                var partitionAssignmentDescriber = partitionAssignmentDescriberMap.get(consumerGroup);
+//                partitionAssignmentDescriber.refreshValues();
+//
+//                System.out.println(partitionAssignmentDescriber.printAssignment());
+//            }
+
+                waitHalfSecond();
             }
-            System.out.println(partitionAssignmentDescriber.printAssignment());
-
-            waitHalfSecond();
         }
     }
 
