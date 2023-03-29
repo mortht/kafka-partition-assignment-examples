@@ -18,17 +18,26 @@ import partitioning.tool.kafka.common.PropertiesLoader;
 public class ConsumerGroupStatus {
 
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
-        if (args.length != 2) {
-            System.err.println("Required parameters: <config-file> <consumer-group>");
+        if (args.length < 2) {
+            System.err.println("Required parameters: <config-file> <consumer-group> [lag threshold]");
             return;
         }
 
         // load args
         final Properties properties = PropertiesLoader.load(args[0]);
-        try (AdminClient adminClient = AdminClient.create(properties)) {
 
-            final List<String> consumerGroups = Arrays.asList(args[1].split("\\s*,\\s*"));
-            System.out.println("Date: " + LocalDateTime.now() + " - consumerGroups: " + consumerGroups + "\n");
+        final List<String> consumerGroups = Arrays.asList(args[1].split("\\s*,\\s*"));
+
+        int msgLagThreshold;
+        try {
+            msgLagThreshold = Integer.parseInt(args[2]);
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            msgLagThreshold = 0;
+        }
+
+        System.out.println("Date: " + LocalDateTime.now() + " - lagThreshold: >= " + msgLagThreshold + " - consumerGroups: " + consumerGroups + "\n");
+
+        try (AdminClient adminClient = AdminClient.create(properties)) {
 
             final Map<String, PartitionAssignmentDescriber> partitionAssignmentDescriberMap = consumerGroups.stream()
                     .collect(Collectors.toMap(consumerGroup -> consumerGroup, consumerGroup -> new PartitionAssignmentDescriber(adminClient, consumerGroup)));
@@ -36,14 +45,14 @@ public class ConsumerGroupStatus {
             final Map<String, OffsetTopicsDescriber> offsetTopicsDescriberMap = consumerGroups.stream()
                     .collect(Collectors.toMap(consumerGroup -> consumerGroup, consumerGroup -> new OffsetTopicsDescriber(adminClient, consumerGroup)));
 
-            final String tableRowTemplate = "%-40.40s  %-4.4s  %-12s  %-12s  %-12s  %-40.40s  %-40.40s";
+            final String tableRowTemplate = "%-25.25s  %-4.4s  %-11s  %-11s  %-11s  %-25.25s  %-65.65s";
 
             while (true) {
                 cleanOutput();
 
-                System.out.println("Date: " + LocalDateTime.now() + " - consumerGroups: " + consumerGroups + "\n");
+                System.out.println("Date: " + LocalDateTime.now() + " - lagThreshold: >= " + msgLagThreshold + " - consumerGroups: " + consumerGroups + "\n");
                 System.out.println(String.format(tableRowTemplate,
-                        "Topic", "Partition", "curr Offset", "end Offset", "message lag", "client Id", "consumerGroup"));
+                        "Topic", "Partition", "curr Offset", "end Offset", "message lag", "consumerGroup", "client Id"));
                 for (var consumerGroup : consumerGroups) {
                     var offsetTopicsDescriber = offsetTopicsDescriberMap.get(consumerGroup);
                     var partitionAssignmentDescriber = partitionAssignmentDescriberMap.get(consumerGroup);
@@ -59,8 +68,10 @@ public class ConsumerGroupStatus {
                         final String clientId = partitionAssignmentDescriber.getClientId(partition);
                         final String instanceId = partitionAssignmentDescriber.getInstanceId(partition);
 
-                        System.out.println(String.format(tableRowTemplate,
-                                partition.topic(), partition.partition(), currentOffset, endOffset, lag, clientId, consumerGroup));
+                        if (lag >= msgLagThreshold) {
+                            System.out.println(String.format(tableRowTemplate,
+                                    partition.topic(), partition.partition(), currentOffset, endOffset, lag, consumerGroup, clientId));
+                        }
                     }
                 }
 
