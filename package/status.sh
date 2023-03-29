@@ -6,7 +6,7 @@ if [[ $# -lt 1 ]] ; then
     exit 0
 fi
 
-CONSUMER_GROUP=$1ssa-enrichment-filterer-application
+CONSUMER_GROUP=$1
 LAG_THRESHOLD=$2
 
 #watch -n 0.2 "date && \
